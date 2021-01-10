@@ -10,7 +10,7 @@ resource "aws_glue_catalog_table" "default" {
     "parquet.compression" = "SNAPPY"
   }
 
-  dynamic partition_keys {
+  dynamic "partition_keys" {
     for_each = var.partition_keys
     iterator = partition_key
     content {
@@ -33,7 +33,7 @@ resource "aws_glue_catalog_table" "default" {
       }
     }
 
-    dynamic columns {
+    dynamic "columns" {
       for_each = var.columns
       iterator = column
       content {

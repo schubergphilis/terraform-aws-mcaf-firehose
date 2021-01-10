@@ -1,12 +1,9 @@
 locals {
   kinesis = var.kinesis_arn != null ? { create = true } : {}
+  kms     = var.kms_key_arn != null ? { create = true } : {}
   s3      = var.create_s3_bucket ? { create = true } : {}
 
   parquet_prefix = "year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
-}
-
-data "aws_kms_key" "default" {
-  key_id = var.kms_key_arn
 }
 
 data "aws_s3_bucket" "default" {
@@ -14,15 +11,7 @@ data "aws_s3_bucket" "default" {
 }
 
 data "aws_iam_policy_document" "firehose_s3_role" {
-  statement {
-    actions = [
-      "kms:Decrypt",
-      "kms:GenerateDataKey"
-    ]
-    resources = [
-      var.kms_key_arn
-    ]
-  }
+  override_json = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_s3_role_kms["create"].json : ""
 
   statement {
     actions = [
@@ -50,6 +39,20 @@ data "aws_iam_policy_document" "firehose_s3_role" {
   }
 }
 
+data "aws_iam_policy_document" "firehose_s3_role_kms" {
+  for_each = local.kms
+
+  statement {
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey"
+    ]
+    resources = [
+      var.kms_key_arn
+    ]
+  }
+}
+
 module "firehose_s3_role" {
   source                = "github.com/schubergphilis/terraform-aws-mcaf-role?ref=v0.3.0"
   name                  = "FirehoseS3Role-${var.name}"
@@ -63,6 +66,8 @@ module "firehose_s3_role" {
 data "aws_iam_policy_document" "firehose_kinesis_role" {
   for_each = local.kinesis
 
+  override_json = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_kinesis_role_kms["create"].json : ""
+
   statement {
     actions = [
       "kinesis:List*",
@@ -73,6 +78,10 @@ data "aws_iam_policy_document" "firehose_kinesis_role" {
       var.kinesis_arn
     ]
   }
+}
+
+data "aws_iam_policy_document" "firehose_kinesis_role_kms" {
+  for_each = local.kms
 
   statement {
     actions = [
@@ -100,7 +109,7 @@ resource "aws_kinesis_firehose_delivery_stream" "default" {
   destination = "extended_s3"
   tags        = var.tags
 
-  dynamic kinesis_source_configuration {
+  dynamic "kinesis_source_configuration" {
     for_each = local.kinesis
 
     content {
