@@ -1,8 +1,7 @@
 resource "aws_glue_catalog_table" "default" {
   name          = replace(var.name, "-", "_")
   database_name = var.glue_catalog_database
-
-  table_type = "EXTERNAL_TABLE"
+  table_type    = "EXTERNAL_TABLE"
 
   parameters = {
     classification        = "parquet"
@@ -12,6 +11,7 @@ resource "aws_glue_catalog_table" "default" {
 
   dynamic "partition_keys" {
     for_each = var.partition_keys
+
     iterator = partition_key
     content {
       name = partition_key.value.name
@@ -35,6 +35,7 @@ resource "aws_glue_catalog_table" "default" {
 
     dynamic "columns" {
       for_each = var.columns
+
       iterator = column
       content {
         name = column.value.name

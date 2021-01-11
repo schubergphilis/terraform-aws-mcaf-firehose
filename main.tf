@@ -1,8 +1,5 @@
 locals {
-  kinesis = var.kinesis_arn != null ? { create = true } : {}
-  kms     = var.kms_key_arn != null ? { create = true } : {}
-  s3      = var.create_s3_bucket ? { create = true } : {}
-
+  kms_policy     = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_kms_role[0].json : null
   parquet_prefix = "year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 }
 
@@ -10,8 +7,22 @@ data "aws_s3_bucket" "default" {
   bucket = var.s3_bucket_name
 }
 
+data "aws_iam_policy_document" "firehose_kms_role" {
+  count = var.kms_key_arn != null ? 1 : 0
+
+  statement {
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey"
+    ]
+    resources = [
+      var.kms_key_arn
+    ]
+  }
+}
+
 data "aws_iam_policy_document" "firehose_s3_role" {
-  override_json = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_s3_role_kms["create"].json : ""
+  override_json = local.kms_policy
 
   statement {
     actions = [
@@ -39,20 +50,6 @@ data "aws_iam_policy_document" "firehose_s3_role" {
   }
 }
 
-data "aws_iam_policy_document" "firehose_s3_role_kms" {
-  for_each = local.kms
-
-  statement {
-    actions = [
-      "kms:Decrypt",
-      "kms:GenerateDataKey"
-    ]
-    resources = [
-      var.kms_key_arn
-    ]
-  }
-}
-
 module "firehose_s3_role" {
   source                = "github.com/schubergphilis/terraform-aws-mcaf-role?ref=v0.3.0"
   name                  = "FirehoseS3Role-${var.name}"
@@ -64,9 +61,9 @@ module "firehose_s3_role" {
 }
 
 data "aws_iam_policy_document" "firehose_kinesis_role" {
-  for_each = local.kinesis
+  count = var.kinesis_arn != null ? 1 : 0
 
-  override_json = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_kinesis_role_kms["create"].json : ""
+  override_json = local.kms_policy
 
   statement {
     actions = [
@@ -80,27 +77,14 @@ data "aws_iam_policy_document" "firehose_kinesis_role" {
   }
 }
 
-data "aws_iam_policy_document" "firehose_kinesis_role_kms" {
-  for_each = local.kms
-
-  statement {
-    actions = [
-      "kms:Decrypt"
-    ]
-    resources = [
-      var.kms_key_arn
-    ]
-  }
-}
-
 module "firehose_kinesis_role" {
-  for_each              = local.kinesis
+  count                 = var.kinesis_arn != null ? 1 : 0
   source                = "github.com/schubergphilis/terraform-aws-mcaf-role?ref=v0.3.0"
   create_policy         = true
   name                  = "FirehoseKinesisRole-${var.name}"
   principal_identifiers = ["firehose.amazonaws.com"]
   principal_type        = "Service"
-  role_policy           = data.aws_iam_policy_document.firehose_kinesis_role["create"].json
+  role_policy           = data.aws_iam_policy_document.firehose_kinesis_role[0].json
   tags                  = var.tags
 }
 
@@ -110,11 +94,11 @@ resource "aws_kinesis_firehose_delivery_stream" "default" {
   tags        = var.tags
 
   dynamic "kinesis_source_configuration" {
-    for_each = local.kinesis
+    for_each = toset([var.kinesis_arn])
 
     content {
-      kinesis_stream_arn = var.kinesis_arn
-      role_arn           = module.firehose_kinesis_role["create"].arn
+      kinesis_stream_arn = each.value
+      role_arn           = module.firehose_kinesis_role[0].arn
     }
   }
 
