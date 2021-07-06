@@ -49,7 +49,8 @@ variable "kinesis_arn" {
 
 variable "kms_key_arn" {
   type        = string
-  description = "The KMS key ARN used to encrypt all data"
+  default     = null
+  description = "Optional KMS key ARN used to encrypt all data"
 }
 
 variable "parquet" {

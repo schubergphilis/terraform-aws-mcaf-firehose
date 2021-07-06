@@ -1,1 +1,1 @@
-# terraform-aws-mcaf-stream
+# terraform-aws-mcaf-firehose
