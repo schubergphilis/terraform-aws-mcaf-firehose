@@ -1,4 +1,5 @@
 locals {
+  kinesis        = var.kinesis_arn != null ? [var.kinesis_arn] : []
   kms_policy     = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_kms_role[0].json : null
   parquet_prefix = "year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 }
@@ -94,7 +95,7 @@ resource "aws_kinesis_firehose_delivery_stream" "default" {
   tags        = var.tags
 
   dynamic "kinesis_source_configuration" {
-    for_each = toset([var.kinesis_arn])
+    for_each = toset(local.kinesis)
 
     content {
       kinesis_stream_arn = each.value
