@@ -4,8 +4,8 @@ output "arn" {
 }
 
 output "glue_table_name" {
+  value       = aws_glue_catalog_table.default.name
   description = "Name of the Glue Table"
-  value       = replace(var.name, "-", "_")
 }
 
 output "name" {
