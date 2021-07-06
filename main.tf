@@ -1,6 +1,7 @@
 locals {
-  kms_policy     = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_kms_role[0].json : null
-  parquet_prefix = "year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
+  kinesis_source_configuration = var.kinesis_arn != null ? { create = true } : {}
+  kms_policy                   = var.kms_key_arn != null ? data.aws_iam_policy_document.firehose_kms_role[0].json : null
+  parquet_prefix               = "year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
 }
 
 data "aws_s3_bucket" "default" {
@@ -94,10 +95,10 @@ resource "aws_kinesis_firehose_delivery_stream" "default" {
   tags        = var.tags
 
   dynamic "kinesis_source_configuration" {
-    for_each = toset([var.kinesis_arn])
+    for_each = local.kinesis_source_configuration
 
     content {
-      kinesis_stream_arn = each.value
+      kinesis_stream_arn = var.kinesis_arn
       role_arn           = module.firehose_kinesis_role[0].arn
     }
   }
